@@ -15,56 +15,37 @@ interface WorkspacePanelProps {
 type Tab = "shell" | "browser" | "editor" | "planner";
 
 function BrowserTab({ sandboxId }: { sandboxId: string | null }) {
-  const [port, setPort] = useState<number | null>(null);
-  const [path, setPath] = useState("");
-  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [noServer, setNoServer] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [vncUrl, setVncUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const buildProxyUrl = useCallback(
-    (p: number, pa: string) => {
-      const cleanPath = pa.replace(/^\/+/, "");
-      return `/api/sandboxes/${sandboxId}/preview/${p}${cleanPath ? `/${cleanPath}` : ""}`;
-    },
-    [sandboxId]
-  );
-
-  const scanPorts = useCallback(async () => {
+  // Poll for VNC availability, then build the noVNC iframe URL
+  useEffect(() => {
     if (!sandboxId) return;
-    setScanning(true);
-    try {
-      const ports = await api.listPorts(sandboxId);
-      if (ports.length > 0) {
-        const detected = ports[0];
-        setPort(detected);
-        setNoServer(false);
-        setCurrentUrl(buildProxyUrl(detected, ""));
-        // Stop polling once we find a port
+
+    setVncUrl(null);
+    setLoading(true);
+    let found = false;
+
+    const check = async () => {
+      if (found) return;
+      const info = await api.getVncInfo(sandboxId);
+      if (info) {
+        found = true;
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
         }
-      } else {
-        setNoServer(true);
+        // noVNC web client served by websockify --web /usr/share/novnc
+        const url = `http://${info.host}:${info.port}/vnc_lite.html?autoconnect=true&resize=scale&reconnect=true&reconnect_delay=1000`;
+        setVncUrl(url);
+        setLoading(false);
       }
-    } catch {
-      setNoServer(true);
-    } finally {
-      setScanning(false);
-    }
-  }, [sandboxId, buildProxyUrl]);
+    };
 
-  // Poll for ports when no server is detected
-  useEffect(() => {
-    if (!sandboxId) return;
-
-    // Initial scan
-    scanPorts();
-
-    // Poll every 3 seconds until a port is found
-    pollRef.current = setInterval(scanPorts, 3000);
+    check();
+    pollRef.current = setInterval(check, 2000);
 
     return () => {
       if (pollRef.current) {
@@ -72,27 +53,13 @@ function BrowserTab({ sandboxId }: { sandboxId: string | null }) {
         pollRef.current = null;
       }
     };
-  }, [sandboxId, scanPorts]);
-
-  // Reset when sandbox changes
-  useEffect(() => {
-    setPort(null);
-    setPath("");
-    setCurrentUrl(null);
-    setNoServer(false);
   }, [sandboxId]);
 
-  const handleNavigate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sandboxId || !port) return;
-    setCurrentUrl(buildProxyUrl(port, path.trim()));
-  };
-
-  const handleRefresh = () => {
-    if (iframeRef.current && currentUrl) {
-      iframeRef.current.src = currentUrl;
+  const handleRefresh = useCallback(() => {
+    if (iframeRef.current && vncUrl) {
+      iframeRef.current.src = vncUrl;
     }
-  };
+  }, [vncUrl]);
 
   if (!sandboxId) {
     return <div className="tab-placeholder">No sandbox connected</div>;
@@ -105,51 +72,34 @@ function BrowserTab({ sandboxId }: { sandboxId: string | null }) {
           type="button"
           className="browser-refresh"
           onClick={handleRefresh}
-          disabled={!currentUrl}
-          title="Refresh"
+          disabled={!vncUrl}
+          title="Reconnect"
         >
           ↻
         </button>
-        {port ? (
-          <form className="browser-url-group" onSubmit={handleNavigate}>
-            <span className="browser-url-prefix">:{port}/</span>
-            <input
-              className="browser-path"
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder=""
-            />
-            <button type="submit" className="browser-go">Go</button>
-          </form>
-        ) : (
-          <div className="browser-url-group">
-            <span className="browser-url-prefix browser-scanning">
-              {scanning ? "Scanning..." : "No server detected"}
-            </span>
-          </div>
-        )}
+        <div className="browser-url-group">
+          <span className={`vnc-status-dot ${vncUrl ? "connected" : "connecting"}`} />
+          <span className="browser-url-prefix">
+            {vncUrl ? "Sandbox Browser (Firefox)" : "Connecting to sandbox browser..."}
+          </span>
+        </div>
       </div>
       <div className="browser-viewport">
-        {currentUrl ? (
+        {vncUrl ? (
           <iframe
             ref={iframeRef}
-            src={currentUrl}
-            title="Sandbox Preview"
+            src={vncUrl}
+            title="Sandbox Browser"
             className="browser-iframe"
-            sandbox="allow-scripts allow-same-origin allow-forms"
+            allow="clipboard-read; clipboard-write"
           />
         ) : (
           <div className="browser-empty">
-            {noServer ? (
-              <>
-                <p>No server running</p>
-                <p className="browser-hint">
-                  Start a server in the sandbox and it will appear here automatically
-                </p>
-              </>
-            ) : (
-              <p>Scanning for servers...</p>
-            )}
+            <div className="vnc-spinner" />
+            <p>{loading ? "Starting sandbox browser..." : "Waiting for VNC..."}</p>
+            <p className="browser-hint">
+              Launching Firefox inside the sandbox environment
+            </p>
           </div>
         )}
       </div>

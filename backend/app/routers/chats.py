@@ -101,6 +101,13 @@ async def create_chat(body: ChatCreate, db: AsyncSession = Depends(get_db)):
         timeout=5,
     )
 
+    # Start the VNC display stack (Xvfb + x11vnc + websockify + Firefox)
+    await exec_command(
+        container_id,
+        "/home/sandbox/start-vnc.sh",
+        timeout=15,
+    )
+
     # Create the chat linked to repo and sandbox
     title = body.title if body.title != "New Chat" else repo.name
     chat = Chat(title=title, repo_id=repo.id, sandbox_id=sandbox.id)

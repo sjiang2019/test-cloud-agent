@@ -79,6 +79,16 @@ export async function listPorts(
   return data.ports;
 }
 
+// ── VNC ──
+
+export async function getVncInfo(
+  sandboxId: string
+): Promise<{ host: string; port: number } | null> {
+  const res = await fetch(`${SANDBOXES}/${sandboxId}/vnc`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 // ── Repos ──
 
 export async function listRepos(): Promise<Repo[]> {

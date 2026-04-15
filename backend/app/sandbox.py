@@ -7,10 +7,13 @@ import aiodocker
 logger = logging.getLogger(__name__)
 
 # Resource limits for sandbox containers
-SANDBOX_MEMORY_LIMIT = 512 * 1024 * 1024  # 512 MB
+SANDBOX_MEMORY_LIMIT = 1024 * 1024 * 1024  # 1 GB (browser needs more RAM)
 SANDBOX_CPU_PERIOD = 100_000
-SANDBOX_CPU_QUOTA = 100_000  # 1 CPU
-SANDBOX_PIDS_LIMIT = 256
+SANDBOX_CPU_QUOTA = 200_000  # 2 CPUs
+SANDBOX_PIDS_LIMIT = 512
+
+# VNC websockify port inside the container
+VNC_CONTAINER_PORT = 6080
 
 
 async def create_container(
@@ -33,6 +36,9 @@ async def create_container(
             "Tty": False,
             "Env": env,
             "NetworkDisabled": not network_enabled,
+            "ExposedPorts": {
+                f"{VNC_CONTAINER_PORT}/tcp": {},
+            },
             "HostConfig": {
                 "Memory": SANDBOX_MEMORY_LIMIT,
                 "CpuPeriod": SANDBOX_CPU_PERIOD,
@@ -40,6 +46,9 @@ async def create_container(
                 "PidsLimit": SANDBOX_PIDS_LIMIT,
                 "ReadonlyRootfs": False,
                 "SecurityOpt": ["no-new-privileges"],
+                "PortBindings": {
+                    f"{VNC_CONTAINER_PORT}/tcp": [{"HostPort": ""}],  # dynamic host port
+                },
             },
         }
         container = await docker.containers.create_or_replace(
@@ -150,6 +159,20 @@ async def get_container_ip(container_id: str) -> str | None:
                 return ip
         # Fallback: top-level IPAddress
         return info.get("NetworkSettings", {}).get("IPAddress") or None
+
+
+async def get_vnc_host_port(container_id: str) -> int | None:
+    """Get the host-mapped port for the VNC websockify inside the container."""
+    async with aiodocker.Docker() as docker:
+        container = docker.containers.container(container_id)
+        info = await container.show()
+        ports = info.get("NetworkSettings", {}).get("Ports", {})
+        bindings = ports.get(f"{VNC_CONTAINER_PORT}/tcp")
+        if bindings and len(bindings) > 0:
+            host_port = bindings[0].get("HostPort")
+            if host_port:
+                return int(host_port)
+    return None
 
 
 async def stop_container(container_id: str) -> None:
