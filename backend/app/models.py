@@ -36,3 +36,32 @@ class Message(Base):
     )
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")
+
+
+class Repo(Base):
+    __tablename__ = "repos"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    url: Mapped[str]
+    name: Mapped[str]
+    status: Mapped[str] = mapped_column(default="pending")  # pending, cloning, ready, error
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class Sandbox(Base):
+    __tablename__ = "sandboxes"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    container_id: Mapped[str | None] = mapped_column(default=None)
+    status: Mapped[str] = mapped_column(default="creating")  # creating, running, stopped, error
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

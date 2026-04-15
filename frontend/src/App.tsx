@@ -1,164 +1,149 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Sidebar from "./components/Sidebar";
 import ChatWindow from "./components/ChatWindow";
-import { Chat, Message } from "./types";
+import RepoPanel from "./components/RepoPanel";
+import WorkspacePanel from "./components/WorkspacePanel";
+import { Chat, Message, Repo } from "./types";
+import * as api from "./api";
 import "./App.css";
 
-const MOCK_CHATS: Chat[] = [
-  {
-    id: "1",
-    name: "Project Planning",
-    lastMessage: "Let's outline the next sprint",
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-  },
-  {
-    id: "2",
-    name: "Code Review",
-    lastMessage: "The PR looks good to me",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
-  },
-  {
-    id: "3",
-    name: "Bug Triage",
-    lastMessage: "Found the root cause of the crash",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-  },
-];
-
-const MOCK_MESSAGES: Record<string, Message[]> = {
-  "1": [
-    {
-      id: "m1",
-      chatId: "1",
-      content: "Hey, can you help me plan the next sprint?",
-      sender: "user",
-      timestamp: new Date(Date.now() - 1000 * 60 * 35),
-    },
-    {
-      id: "m2",
-      chatId: "1",
-      content:
-        "Sure! What are the main priorities we should focus on this sprint?",
-      sender: "assistant",
-      timestamp: new Date(Date.now() - 1000 * 60 * 34),
-    },
-    {
-      id: "m3",
-      chatId: "1",
-      content: "Let's outline the next sprint",
-      sender: "user",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    },
-  ],
-  "2": [
-    {
-      id: "m4",
-      chatId: "2",
-      content: "Can you review the auth module changes?",
-      sender: "user",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4),
-    },
-    {
-      id: "m5",
-      chatId: "2",
-      content: "The PR looks good to me",
-      sender: "assistant",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
-    },
-  ],
-  "3": [
-    {
-      id: "m6",
-      chatId: "3",
-      content: "Users are reporting a crash on the dashboard page",
-      sender: "user",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 25),
-    },
-    {
-      id: "m7",
-      chatId: "3",
-      content:
-        "I'll investigate. Can you share the error logs?",
-      sender: "assistant",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24.5),
-    },
-    {
-      id: "m8",
-      chatId: "3",
-      content: "Found the root cause of the crash",
-      sender: "assistant",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    },
-  ],
-};
-
-let nextId = 100;
-
 function App() {
-  const [chats, setChats] = useState<Chat[]>(MOCK_CHATS);
-  const [messages, setMessages] = useState<Record<string, Message[]>>(MOCK_MESSAGES);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>("1");
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [sandboxId, setSandboxId] = useState<string | null>(null);
 
-  const handleNewChat = () => {
-    const id = String(nextId++);
-    const newChat: Chat = {
-      id,
-      name: `New Chat`,
-      lastMessage: "",
-      timestamp: new Date(),
-    };
-    setChats((prev) => [newChat, ...prev]);
-    setMessages((prev) => ({ ...prev, [id]: [] }));
-    setSelectedChatId(id);
+  useEffect(() => {
+    Promise.all([api.listChats(), api.listRepos()]).then(([chatData, repoData]) => {
+      setChats(chatData);
+      setRepos(repoData);
+      if (chatData.length > 0) {
+        setSelectedChatId(chatData[0].id);
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  // Create a sandbox on mount
+  useEffect(() => {
+    api.createSandbox().then((sb) => setSandboxId(sb.id)).catch(() => {});
+  }, []);
+
+  const loadMessages = useCallback(async (chatId: string) => {
+    const detail = await api.getChat(chatId);
+    setMessages(detail.messages);
+  }, []);
+
+  useEffect(() => {
+    if (selectedChatId) {
+      loadMessages(selectedChatId);
+    } else {
+      setMessages([]);
+    }
+  }, [selectedChatId, loadMessages]);
+
+  const handleNewChat = async () => {
+    const chat = await api.createChat();
+    setChats((prev) => [chat, ...prev]);
+    setSelectedChatId(chat.id);
   };
 
-  const handleSendMessage = (content: string) => {
+  const handleSelectChat = (chatId: string) => {
+    setSelectedChatId(chatId);
+  };
+
+  const handleSendMessage = async (content: string) => {
     if (!selectedChatId) return;
 
-    const newMessage: Message = {
-      id: `m${nextId++}`,
-      chatId: selectedChatId,
+    // Optimistically add user message
+    const tempUserMsg: Message = {
+      id: "temp-" + Date.now(),
+      chat_id: selectedChatId,
+      role: "user",
       content,
-      sender: "user",
-      timestamp: new Date(),
+      created_at: new Date().toISOString(),
     };
+    setMessages((prev) => [...prev, tempUserMsg]);
+    setIsWaiting(true);
 
-    setMessages((prev) => ({
-      ...prev,
-      [selectedChatId]: [...(prev[selectedChatId] || []), newMessage],
-    }));
+    try {
+      await api.addMessage(selectedChatId, content);
+      await loadMessages(selectedChatId);
+    } finally {
+      setIsWaiting(false);
+    }
 
     setChats((prev) =>
       prev.map((chat) =>
         chat.id === selectedChatId
-          ? { ...chat, lastMessage: content, timestamp: new Date() }
+          ? { ...chat, updated_at: new Date().toISOString() }
           : chat
       )
     );
   };
 
+  const handleDeleteChat = async (chatId: string) => {
+    await api.deleteChat(chatId);
+    setChats((prev) => prev.filter((c) => c.id !== chatId));
+    if (selectedChatId === chatId) {
+      setSelectedChatId(chats.find((c) => c.id !== chatId)?.id ?? null);
+    }
+  };
+
+  const handleAddRepo = async (url: string) => {
+    const repo = await api.createRepo(url);
+    setRepos((prev) => [repo, ...prev]);
+  };
+
+  const handleDeleteRepo = async (repoId: string) => {
+    await api.deleteRepo(repoId);
+    setRepos((prev) => prev.filter((r) => r.id !== repoId));
+  };
+
+  const handleExecCommand = sandboxId
+    ? (command: string) => api.execCommand(sandboxId, command)
+    : undefined;
+
   const selectedChat = chats.find((c) => c.id === selectedChatId);
-  const currentMessages = selectedChatId ? messages[selectedChatId] || [] : [];
+
+  if (loading) {
+    return <div className="app loading">Loading...</div>;
+  }
 
   return (
     <div className="app">
-      <Sidebar
-        chats={chats}
-        selectedChatId={selectedChatId}
-        onSelectChat={setSelectedChatId}
-        onNewChat={handleNewChat}
-      />
-      {selectedChat ? (
-        <ChatWindow
-          messages={currentMessages}
-          chatName={selectedChat.name}
-          onSendMessage={handleSendMessage}
+      <div className="left-panel">
+        <Sidebar
+          chats={chats}
+          selectedChatId={selectedChatId}
+          onSelectChat={handleSelectChat}
+          onNewChat={handleNewChat}
+          onDeleteChat={handleDeleteChat}
         />
-      ) : (
-        <div className="no-chat-selected">
-          <p>Select a chat or start a new one</p>
-        </div>
-      )}
+        <RepoPanel
+          repos={repos}
+          onAddRepo={handleAddRepo}
+          onDeleteRepo={handleDeleteRepo}
+        />
+      </div>
+      <div className="center-panel">
+        {selectedChat ? (
+          <ChatWindow
+            messages={messages}
+            chatName={selectedChat.title}
+            onSendMessage={handleSendMessage}
+            isWaiting={isWaiting}
+          />
+        ) : (
+          <div className="no-chat-selected">
+            <p>Select a session or start a new one</p>
+          </div>
+        )}
+      </div>
+      <WorkspacePanel onExecCommand={handleExecCommand} />
     </div>
   );
 }

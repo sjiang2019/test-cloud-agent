@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 
 class MessageCreate(BaseModel):
-    role: str
     content: str
 
 
@@ -30,3 +29,43 @@ class ChatResponse(BaseModel):
 
 class ChatDetail(ChatResponse):
     messages: list[MessageResponse] = []
+
+
+# ── Repo ────────────────────────────────────────────────
+
+class RepoCreate(BaseModel):
+    url: str
+
+
+class RepoResponse(BaseModel):
+    id: uuid.UUID
+    url: str
+    name: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# ── Sandbox ──────────────────────────────────────────────
+
+class SandboxCreate(BaseModel):
+    image: str = "cloud-agent-sandbox:latest"
+
+
+class SandboxResponse(BaseModel):
+    id: uuid.UUID
+    container_id: str | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExecRequest(BaseModel):
+    command: str
+    timeout: int = 30  # seconds
+
+
+class ExecResponse(BaseModel):
+    exit_code: int
+    stdout: str
+    stderr: str

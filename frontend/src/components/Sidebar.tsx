@@ -6,18 +6,22 @@ interface SidebarProps {
   selectedChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
+  onDeleteChat: (chatId: string) => void;
 }
 
-function formatTime(date: Date): string {
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
   const now = new Date();
   const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
 
-  if (days === 0) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days}d ago`;
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  if (hours < 24) return `${hours}h`;
+  if (days === 1) return "1d";
+  if (days < 7) return `${days}d`;
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
@@ -26,11 +30,12 @@ export default function Sidebar({
   selectedChatId,
   onSelectChat,
   onNewChat,
+  onDeleteChat,
 }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h2>Chats</h2>
+        <h2>Sessions</h2>
         <button className="new-chat-btn" onClick={onNewChat}>
           + New
         </button>
@@ -43,12 +48,25 @@ export default function Sidebar({
             onClick={() => onSelectChat(chat.id)}
           >
             <div className="chat-item-top">
-              <span className="chat-name">{chat.name}</span>
-              <span className="chat-time">{formatTime(chat.timestamp)}</span>
+              <span className="chat-name">{chat.title}</span>
+              <span className="chat-time">{formatTime(chat.updated_at)}</span>
             </div>
-            <p className="chat-preview">{chat.lastMessage}</p>
+            <div className="chat-item-bottom">
+              <button
+                className="delete-chat-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteChat(chat.id);
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </li>
         ))}
+        {chats.length === 0 && (
+          <li className="chat-list-empty">No sessions yet</li>
+        )}
       </ul>
     </aside>
   );

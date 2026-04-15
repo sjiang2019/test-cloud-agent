@@ -1,0 +1,102 @@
+import asyncio
+import logging
+
+import aiodocker
+
+logger = logging.getLogger(__name__)
+
+# Resource limits for sandbox containers
+SANDBOX_MEMORY_LIMIT = 512 * 1024 * 1024  # 512 MB
+SANDBOX_CPU_PERIOD = 100_000
+SANDBOX_CPU_QUOTA = 100_000  # 1 CPU
+SANDBOX_PIDS_LIMIT = 256
+
+
+async def create_container(image: str = "cloud-agent-sandbox:latest") -> str:
+    """Create and start a sandbox container. Returns the container ID."""
+    async with aiodocker.Docker() as docker:
+        config = {
+            "Image": image,
+            "Cmd": ["sleep", "infinity"],
+            "AttachStdout": False,
+            "AttachStderr": False,
+            "Tty": False,
+            "NetworkDisabled": True,
+            "HostConfig": {
+                "Memory": SANDBOX_MEMORY_LIMIT,
+                "CpuPeriod": SANDBOX_CPU_PERIOD,
+                "CpuQuota": SANDBOX_CPU_QUOTA,
+                "PidsLimit": SANDBOX_PIDS_LIMIT,
+                "ReadonlyRootfs": False,
+                "SecurityOpt": ["no-new-privileges"],
+            },
+        }
+        container = await docker.containers.create_or_replace(
+            name=None, config=config
+        )
+        await container.start()
+        info = await container.show()
+        return info["Id"]
+
+
+async def exec_command(
+    container_id: str, command: str, timeout: int = 30
+) -> tuple[int, str, str]:
+    """Execute a command inside a sandbox container.
+
+    Returns (exit_code, stdout, stderr).
+    """
+    async with aiodocker.Docker() as docker:
+        container = docker.containers.container(container_id)
+
+        exec_inst = await container.exec(
+            cmd=["/bin/bash", "-c", command],
+            stdout=True,
+            stderr=True,
+        )
+
+        stdout_chunks: list[bytes] = []
+        stderr_chunks: list[bytes] = []
+
+        async def collect_output():
+            async with exec_inst.start(detach=False) as stream:
+                while True:
+                    msg = await stream.read_out()
+                    if msg is None:
+                        break
+                    # stream type 1 = stdout, 2 = stderr
+                    if msg.stream == 1:
+                        stdout_chunks.append(msg.data)
+                    elif msg.stream == 2:
+                        stderr_chunks.append(msg.data)
+
+        try:
+            await asyncio.wait_for(collect_output(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return (
+                -1,
+                b"".join(stdout_chunks).decode(errors="replace"),
+                "Error: command timed out after {} seconds".format(timeout),
+            )
+
+        inspect = await exec_inst.inspect()
+        exit_code = inspect.get("ExitCode", -1)
+
+        stdout = b"".join(stdout_chunks).decode(errors="replace")
+        stderr = b"".join(stderr_chunks).decode(errors="replace")
+
+        return (exit_code, stdout, stderr)
+
+
+async def stop_container(container_id: str) -> None:
+    """Stop and remove a sandbox container."""
+    async with aiodocker.Docker() as docker:
+        container = docker.containers.container(container_id)
+        try:
+            await container.kill()
+        except aiodocker.exceptions.DockerError:
+            pass  # already stopped
+        try:
+            await container.delete(force=True)
+        except aiodocker.exceptions.DockerError as e:
+            logger.warning("Failed to remove container %s: %s", container_id, e)

@@ -1,4 +1,4 @@
-.PHONY: install install-backend install-frontend dev backend frontend docker-up docker-down docker-build
+.PHONY: install install-backend install-frontend dev backend frontend docker-up docker-down docker-build sandbox-image
 
 install: install-backend install-frontend
 
@@ -25,3 +25,6 @@ docker-down:
 
 docker-build:
 	docker compose up -d --build
+
+sandbox-image:
+	docker build -t cloud-agent-sandbox:latest ./sandbox

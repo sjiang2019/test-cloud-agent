@@ -1,14 +1,27 @@
 export interface Chat {
   id: string;
-  name: string;
-  lastMessage: string;
-  timestamp: Date;
+  title: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Message {
   id: string;
-  chatId: string;
+  chat_id: string;
+  role: "user" | "assistant";
   content: string;
-  sender: "user" | "assistant";
-  timestamp: Date;
+  created_at: string;
+}
+
+export interface ChatDetail extends Chat {
+  messages: Message[];
+}
+
+export interface Repo {
+  id: string;
+  url: string;
+  name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
 }

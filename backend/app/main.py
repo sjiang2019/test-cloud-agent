@@ -1,9 +1,13 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI
 
 from app.database import Base, engine
-from app.routers import chats
+from app.routers import chats, repos, sandboxes
 
 
 @asynccontextmanager
@@ -15,6 +19,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(chats.router)
+app.include_router(repos.router)
+app.include_router(sandboxes.router)
 
 
 @app.get("/")
