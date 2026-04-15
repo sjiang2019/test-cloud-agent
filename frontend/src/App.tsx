@@ -14,7 +14,6 @@ function App() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
   const [isWaiting, setIsWaiting] = useState(false);
-  const [sandboxId, setSandboxId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([api.listChats(), api.listRepos()]).then(([chatData, repoData]) => {
@@ -25,11 +24,6 @@ function App() {
       }
       setLoading(false);
     });
-  }, []);
-
-  // Create a sandbox on mount
-  useEffect(() => {
-    api.createSandbox().then((sb) => setSandboxId(sb.id)).catch(() => {});
   }, []);
 
   const loadMessages = useCallback(async (chatId: string) => {
@@ -45,8 +39,8 @@ function App() {
     }
   }, [selectedChatId, loadMessages]);
 
-  const handleNewChat = async () => {
-    const chat = await api.createChat();
+  const handleNewChat = async (repoId: string) => {
+    const chat = await api.createChat(repoId);
     setChats((prev) => [chat, ...prev]);
     setSelectedChatId(chat.id);
   };
@@ -103,11 +97,11 @@ function App() {
     setRepos((prev) => prev.filter((r) => r.id !== repoId));
   };
 
-  const handleExecCommand = sandboxId
-    ? (command: string) => api.execCommand(sandboxId, command)
-    : undefined;
-
   const selectedChat = chats.find((c) => c.id === selectedChatId);
+
+  const handleExecCommand = selectedChat?.sandbox_id
+    ? (command: string) => api.execCommand(selectedChat.sandbox_id!, command)
+    : undefined;
 
   if (loading) {
     return <div className="app loading">Loading...</div>;
@@ -118,6 +112,7 @@ function App() {
       <div className="left-panel">
         <Sidebar
           chats={chats}
+          repos={repos}
           selectedChatId={selectedChatId}
           onSelectChat={handleSelectChat}
           onNewChat={handleNewChat}

@@ -1,11 +1,12 @@
-import React from "react";
-import { Chat } from "../types";
+import React, { useState } from "react";
+import { Chat, Repo } from "../types";
 
 interface SidebarProps {
   chats: Chat[];
+  repos: Repo[];
   selectedChatId: string | null;
   onSelectChat: (chatId: string) => void;
-  onNewChat: () => void;
+  onNewChat: (repoId: string) => void;
   onDeleteChat: (chatId: string) => void;
 }
 
@@ -27,19 +28,54 @@ function formatTime(dateStr: string): string {
 
 export default function Sidebar({
   chats,
+  repos,
   selectedChatId,
   onSelectChat,
   onNewChat,
   onDeleteChat,
 }: SidebarProps) {
+  const [showRepoSelect, setShowRepoSelect] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
+
+  const readyRepos = repos.filter((r) => r.status === "ready");
+
+  const handleRepoSelect = async (repoId: string) => {
+    setCreatingChat(true);
+    try {
+      await onNewChat(repoId);
+    } finally {
+      setShowRepoSelect(false);
+      setCreatingChat(false);
+    }
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <h2>Sessions</h2>
-        <button className="new-chat-btn" onClick={onNewChat}>
+        <button
+          className="new-chat-btn"
+          onClick={() => setShowRepoSelect(!showRepoSelect)}
+          disabled={readyRepos.length === 0 || creatingChat}
+        >
           + New
         </button>
       </div>
+      {showRepoSelect && (
+        <div className="repo-select-dropdown">
+          <p className="repo-select-label">Select a repo:</p>
+          {readyRepos.map((repo) => (
+            <button
+              key={repo.id}
+              className="repo-select-item"
+              onClick={() => handleRepoSelect(repo.id)}
+              disabled={creatingChat}
+            >
+              {repo.name}
+            </button>
+          ))}
+        </div>
+      )}
       <ul className="chat-list">
         {chats.map((chat) => (
           <li

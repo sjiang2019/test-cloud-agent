@@ -12,7 +12,10 @@ SANDBOX_CPU_QUOTA = 100_000  # 1 CPU
 SANDBOX_PIDS_LIMIT = 256
 
 
-async def create_container(image: str = "cloud-agent-sandbox:latest") -> str:
+async def create_container(
+    image: str = "cloud-agent-sandbox:latest",
+    network_enabled: bool = False,
+) -> str:
     """Create and start a sandbox container. Returns the container ID."""
     async with aiodocker.Docker() as docker:
         config = {
@@ -21,7 +24,7 @@ async def create_container(image: str = "cloud-agent-sandbox:latest") -> str:
             "AttachStdout": False,
             "AttachStderr": False,
             "Tty": False,
-            "NetworkDisabled": True,
+            "NetworkDisabled": not network_enabled,
             "HostConfig": {
                 "Memory": SANDBOX_MEMORY_LIMIT,
                 "CpuPeriod": SANDBOX_CPU_PERIOD,
@@ -37,6 +40,17 @@ async def create_container(image: str = "cloud-agent-sandbox:latest") -> str:
         await container.start()
         info = await container.show()
         return info["Id"]
+
+
+async def disable_network(container_id: str) -> None:
+    """Disconnect a container from all networks."""
+    async with aiodocker.Docker() as docker:
+        container = docker.containers.container(container_id)
+        info = await container.show()
+        networks = info.get("NetworkSettings", {}).get("Networks", {})
+        for net_name in networks:
+            network = await docker.networks.get(net_name)
+            await network.disconnect({"Container": container_id})
 
 
 async def exec_command(

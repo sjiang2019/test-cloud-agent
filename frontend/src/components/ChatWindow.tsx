@@ -8,6 +8,40 @@ interface ChatWindowProps {
   isWaiting: boolean;
 }
 
+function ToolCallMessage({ message }: { message: Message }) {
+  if (!message.tool_calls) return null;
+
+  return (
+    <div className="message tool-call">
+      <div className="message-avatar">A</div>
+      <div className="tool-call-bubble">
+        {message.content && (
+          <div className="tool-call-thinking">{message.content}</div>
+        )}
+        {message.tool_calls.map((tc) => {
+          const args = JSON.parse(tc.function.arguments);
+          return (
+            <div key={tc.id} className="tool-call-cmd">
+              <span className="tool-call-label">bash</span>
+              <code>{args.command}</code>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ToolResultMessage({ message }: { message: Message }) {
+  return (
+    <div className="message tool-result">
+      <div className="tool-result-bubble">
+        <pre>{message.content}</pre>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatWindow({
   messages,
   chatName,
@@ -36,6 +70,30 @@ export default function ChatWindow({
     }
   };
 
+  const renderMessage = (msg: Message) => {
+    // Assistant message with tool calls
+    if (msg.role === "assistant" && msg.tool_calls && msg.tool_calls.length > 0) {
+      return <ToolCallMessage key={msg.id} message={msg} />;
+    }
+
+    // Tool result
+    if (msg.role === "tool") {
+      return <ToolResultMessage key={msg.id} message={msg} />;
+    }
+
+    // Regular user or assistant text message
+    if (msg.role === "assistant" && !msg.content) return null;
+
+    return (
+      <div key={msg.id} className={`message ${msg.role}`}>
+        <div className="message-avatar">
+          {msg.role === "user" ? "U" : "A"}
+        </div>
+        <div className="message-bubble">{msg.content}</div>
+      </div>
+    );
+  };
+
   return (
     <div className="chat-window">
       <div className="chat-header">
@@ -43,14 +101,7 @@ export default function ChatWindow({
         <h2>{chatName}</h2>
       </div>
       <div className="messages">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`message ${msg.role}`}>
-            <div className="message-avatar">
-              {msg.role === "user" ? "U" : "A"}
-            </div>
-            <div className="message-bubble">{msg.content}</div>
-          </div>
-        ))}
+        {messages.map(renderMessage)}
         {isWaiting && (
           <div className="typing-indicator">
             <div className="message-avatar">A</div>

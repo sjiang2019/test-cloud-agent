@@ -12,17 +12,22 @@ class MessageResponse(BaseModel):
     id: uuid.UUID
     chat_id: uuid.UUID
     role: str
-    content: str
+    content: str | None = None
+    tool_calls: list | None = None
+    tool_call_id: str | None = None
     created_at: datetime
 
 
 class ChatCreate(BaseModel):
+    repo_id: uuid.UUID
     title: str = "New Chat"
 
 
 class ChatResponse(BaseModel):
     id: uuid.UUID
     title: str
+    repo_id: uuid.UUID
+    sandbox_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 

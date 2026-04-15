@@ -10,11 +10,11 @@ export async function listChats(): Promise<Chat[]> {
   return res.json();
 }
 
-export async function createChat(title = "New Chat"): Promise<Chat> {
+export async function createChat(repoId: string, title = "New Chat"): Promise<Chat> {
   const res = await fetch(CHATS, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ repo_id: repoId, title }),
   });
   if (!res.ok) throw new Error("Failed to create chat");
   return res.json();
@@ -34,7 +34,7 @@ export async function deleteChat(chatId: string): Promise<void> {
 export async function addMessage(
   chatId: string,
   content: string
-): Promise<Message> {
+): Promise<Message[]> {
   const res = await fetch(`${CHATS}/${chatId}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

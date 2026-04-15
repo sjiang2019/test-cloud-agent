@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from urllib.parse import urlparse
 
@@ -28,10 +29,26 @@ async def list_repos(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
+async def check_repo_accessible(url: str) -> bool:
+    """Check if a git repo URL is reachable via git ls-remote."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "git", "ls-remote", "--exit-code", url,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(proc.wait(), timeout=15)
+        return proc.returncode == 0
+    except (asyncio.TimeoutError, OSError):
+        return False
+
+
 @router.post("", response_model=RepoResponse, status_code=201)
 async def create_repo(body: RepoCreate, db: AsyncSession = Depends(get_db)):
     name = extract_repo_name(body.url)
-    repo = Repo(url=body.url, name=name)
+    reachable = await check_repo_accessible(body.url)
+    status = "ready" if reachable else "error"
+    repo = Repo(url=body.url, name=name, status=status)
     db.add(repo)
     await db.commit()
     await db.refresh(repo)

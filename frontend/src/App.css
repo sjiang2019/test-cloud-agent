@@ -61,10 +61,55 @@
   transition: all 0.15s;
 }
 
-.new-chat-btn:hover {
+.new-chat-btn:hover:not(:disabled) {
   background: #2a2a2a;
   color: #fff;
   border-color: #444;
+}
+
+.new-chat-btn:disabled {
+  color: #555;
+  cursor: not-allowed;
+}
+
+/* Repo select dropdown */
+.repo-select-dropdown {
+  padding: 8px;
+  border-bottom: 1px solid #1e1e1e;
+  background: #151515;
+}
+
+.repo-select-label {
+  margin: 0 0 6px 4px;
+  font-size: 11px;
+  color: #888;
+}
+
+.repo-select-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #ddd;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  margin-bottom: 4px;
+  transition: all 0.15s;
+}
+
+.repo-select-item:hover:not(:disabled) {
+  background: #222;
+  border-color: #444;
+  color: #fff;
+}
+
+.repo-select-item:disabled {
+  color: #555;
+  cursor: wait;
 }
 
 /* Chat list */
@@ -158,6 +203,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   border-right: 1px solid #1e1e1e;
 }
 
@@ -166,6 +212,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .chat-header {
@@ -259,6 +306,79 @@
   color: #e0e0e0;
   border: 1px solid #1e1e1e;
   border-top-left-radius: 4px;
+}
+
+/* Tool call messages */
+.message.tool-call {
+  display: flex;
+  gap: 12px;
+}
+
+.tool-call-bubble {
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tool-call-thinking {
+  font-size: 13px;
+  color: #999;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.tool-call-cmd {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #0d1117;
+  border: 1px solid #1e2a3a;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+}
+
+.tool-call-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #58a6ff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.tool-call-cmd code {
+  font-size: 13px;
+  color: #e0e0e0;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* Tool result messages */
+.message.tool-result {
+  padding-left: 40px;
+}
+
+.tool-result-bubble {
+  max-width: 85%;
+  padding: 8px 12px;
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.tool-result-bubble pre {
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 /* Typing indicator */
