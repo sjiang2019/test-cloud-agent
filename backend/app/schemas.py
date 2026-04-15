@@ -47,8 +47,17 @@ class RepoResponse(BaseModel):
     url: str
     name: str
     status: str
+    file_count: int
     created_at: datetime
     updated_at: datetime
+
+
+class RepoFileResponse(BaseModel):
+    id: uuid.UUID
+    repo_id: uuid.UUID
+    path: str
+    size: int
+    created_at: datetime
 
 
 # ── Sandbox ──────────────────────────────────────────────

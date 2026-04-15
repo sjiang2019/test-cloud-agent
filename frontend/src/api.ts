@@ -70,6 +70,15 @@ export async function execCommand(
   return res.json();
 }
 
+export async function listPorts(
+  sandboxId: string
+): Promise<number[]> {
+  const res = await fetch(`${SANDBOXES}/${sandboxId}/ports`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.ports;
+}
+
 // ── Repos ──
 
 export async function listRepos(): Promise<Repo[]> {
@@ -85,6 +94,12 @@ export async function createRepo(url: string): Promise<Repo> {
     body: JSON.stringify({ url }),
   });
   if (!res.ok) throw new Error("Failed to add repo");
+  return res.json();
+}
+
+export async function getRepo(repoId: string): Promise<Repo> {
+  const res = await fetch(`${REPOS_BASE}/${repoId}`);
+  if (!res.ok) throw new Error("Failed to fetch repo");
   return res.json();
 }
 

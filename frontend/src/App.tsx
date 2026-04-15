@@ -97,6 +97,12 @@ function App() {
     setRepos((prev) => prev.filter((r) => r.id !== repoId));
   };
 
+  const handleRepoUpdated = useCallback((updated: Repo) => {
+    setRepos((prev) =>
+      prev.map((r) => (r.id === updated.id ? updated : r))
+    );
+  }, []);
+
   const selectedChat = chats.find((c) => c.id === selectedChatId);
 
   const handleExecCommand = selectedChat?.sandbox_id
@@ -122,6 +128,7 @@ function App() {
           repos={repos}
           onAddRepo={handleAddRepo}
           onDeleteRepo={handleDeleteRepo}
+          onRepoUpdated={handleRepoUpdated}
         />
       </div>
       <div className="center-panel">
@@ -138,7 +145,10 @@ function App() {
           </div>
         )}
       </div>
-      <WorkspacePanel onExecCommand={handleExecCommand} />
+      <WorkspacePanel
+        sandboxId={selectedChat?.sandbox_id ?? null}
+        onExecCommand={handleExecCommand}
+      />
     </div>
   );
 }

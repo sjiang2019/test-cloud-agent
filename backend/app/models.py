@@ -13,7 +13,7 @@ class Chat(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(default="New Chat")
-    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id"))
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     sandbox_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("sandboxes.id", ondelete="SET NULL"), default=None
     )
@@ -53,13 +53,33 @@ class Repo(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     url: Mapped[str]
     name: Mapped[str]
-    status: Mapped[str] = mapped_column(default="pending")  # pending, cloning, ready, error
+    status: Mapped[str] = mapped_column(default="pending")  # pending, cloning, indexing, ready, error
+    file_count: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    files: Mapped[list["RepoFile"]] = relationship(
+        cascade="all, delete-orphan"
+    )
+
+
+class RepoFile(Base):
+    __tablename__ = "repo_files"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    path: Mapped[str]
+    content: Mapped[str] = mapped_column(Text)
+    size: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    repo: Mapped["Repo"] = relationship()
 
 
 class Sandbox(Base):

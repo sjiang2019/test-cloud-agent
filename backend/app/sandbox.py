@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 import aiodocker
 
@@ -17,6 +18,12 @@ async def create_container(
     network_enabled: bool = False,
 ) -> str:
     """Create and start a sandbox container. Returns the container ID."""
+    env = []
+    github_token = os.getenv("GITHUB_TOKEN")
+    if github_token:
+        env.append(f"GITHUB_TOKEN={github_token}")
+        env.append(f"GH_TOKEN={github_token}")
+
     async with aiodocker.Docker() as docker:
         config = {
             "Image": image,
@@ -24,6 +31,7 @@ async def create_container(
             "AttachStdout": False,
             "AttachStderr": False,
             "Tty": False,
+            "Env": env,
             "NetworkDisabled": not network_enabled,
             "HostConfig": {
                 "Memory": SANDBOX_MEMORY_LIMIT,
@@ -42,15 +50,43 @@ async def create_container(
         return info["Id"]
 
 
+SANDBOX_NETWORK = "cloud-agent-sandbox-net"
+
+
+async def _ensure_sandbox_network() -> str:
+    """Ensure an internal-only Docker network exists. Returns the network ID."""
+    async with aiodocker.Docker() as docker:
+        try:
+            network = await docker.networks.get(SANDBOX_NETWORK)
+            return network.id
+        except aiodocker.exceptions.DockerError:
+            pass
+        network = await docker.networks.create({
+            "Name": SANDBOX_NETWORK,
+            "Internal": True,  # no outbound internet
+            "Driver": "bridge",
+        })
+        return network.id
+
+
 async def disable_network(container_id: str) -> None:
-    """Disconnect a container from all networks."""
+    """Move container from default bridge to internal-only sandbox network."""
+    await _ensure_sandbox_network()
     async with aiodocker.Docker() as docker:
         container = docker.containers.container(container_id)
         info = await container.show()
+
+        # Connect to sandbox network first
+        sandbox_net = await docker.networks.get(SANDBOX_NETWORK)
+        await sandbox_net.connect({"Container": container_id})
+
+        # Then disconnect from all other networks
         networks = info.get("NetworkSettings", {}).get("Networks", {})
         for net_name in networks:
-            network = await docker.networks.get(net_name)
-            await network.disconnect({"Container": container_id})
+            if net_name == SANDBOX_NETWORK:
+                continue
+            net = await docker.networks.get(net_name)
+            await net.disconnect({"Container": container_id})
 
 
 async def exec_command(
@@ -100,6 +136,20 @@ async def exec_command(
         stderr = b"".join(stderr_chunks).decode(errors="replace")
 
         return (exit_code, stdout, stderr)
+
+
+async def get_container_ip(container_id: str) -> str | None:
+    """Get the container's IP address on the bridge network."""
+    async with aiodocker.Docker() as docker:
+        container = docker.containers.container(container_id)
+        info = await container.show()
+        networks = info.get("NetworkSettings", {}).get("Networks", {})
+        for net in networks.values():
+            ip = net.get("IPAddress")
+            if ip:
+                return ip
+        # Fallback: top-level IPAddress
+        return info.get("NetworkSettings", {}).get("IPAddress") or None
 
 
 async def stop_container(container_id: str) -> None:

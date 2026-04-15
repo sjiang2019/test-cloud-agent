@@ -94,16 +94,22 @@ async def create_chat(body: ChatCreate, db: AsyncSession = Depends(get_db)):
         await db.commit()
         raise HTTPException(status_code=500, detail=f"Failed to clone repo: {stderr}")
 
-    # Disable network after clone
-    await disable_network(container_id)
+    # Start a file server so the browser tab has content immediately
+    await exec_command(
+        container_id,
+        "cd /home/sandbox/repo && nohup python3 -m http.server 8080 &>/dev/null &",
+        timeout=5,
+    )
 
     # Create the chat linked to repo and sandbox
     title = body.title if body.title != "New Chat" else repo.name
     chat = Chat(title=title, repo_id=repo.id, sandbox_id=sandbox.id)
     db.add(chat)
     await db.commit()
-    await db.refresh(chat)
-    return chat
+
+    # Re-fetch to avoid lazy-load issues with related objects
+    result = await db.execute(select(Chat).where(Chat.id == chat.id))
+    return result.scalar_one()
 
 
 @router.get("/{chat_id}", response_model=ChatDetail)

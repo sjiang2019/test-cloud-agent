@@ -35,6 +35,7 @@ export interface Repo {
   url: string;
   name: string;
   status: string;
+  file_count: number;
   created_at: string;
   updated_at: string;
 }

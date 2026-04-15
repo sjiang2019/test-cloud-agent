@@ -592,6 +592,163 @@
   color: #444;
 }
 
+/* Browser tab */
+.browser-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #0d0d0d;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.browser-refresh {
+  width: 28px;
+  height: 28px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.browser-refresh:hover:not(:disabled) {
+  background: #222;
+  color: #ccc;
+  border-color: #444;
+}
+
+.browser-refresh:disabled {
+  color: #444;
+  cursor: not-allowed;
+}
+
+.browser-url-group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 0 10px;
+  height: 28px;
+  min-width: 0;
+  transition: border-color 0.15s;
+}
+
+.browser-url-group:focus-within {
+  border-color: #444;
+}
+
+.browser-url-prefix {
+  color: #666;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+  flex-shrink: 0;
+}
+
+.browser-url-prefix.browser-scanning {
+  color: #555;
+  font-style: italic;
+}
+
+.browser-path {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: #e0e0e0;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+}
+
+.browser-path::placeholder {
+  color: #444;
+}
+
+.browser-go {
+  padding: 4px 12px;
+  height: 28px;
+  background: #1e1e1e;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.browser-go:hover {
+  background: #2a2a2a;
+  color: #fff;
+  border-color: #444;
+}
+
+.browser-viewport {
+  flex: 1;
+  position: relative;
+  background: #fff;
+  min-height: 0;
+}
+
+.browser-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.browser-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+}
+
+.browser-empty p {
+  margin: 0;
+  color: #555;
+  font-size: 13px;
+}
+
+.browser-hint {
+  margin-top: 4px !important;
+  font-size: 12px !important;
+  color: #333 !important;
+}
+
+.browser-error {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 12px;
+}
+
 /* Browser/Editor/Planner placeholder */
 .tab-placeholder {
   flex: 1;
@@ -731,6 +888,11 @@
 .repo-status.cloning {
   color: #3b82f6;
   background: rgba(59, 130, 246, 0.1);
+}
+
+.repo-status.indexing {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
 }
 
 .repo-status.ready {

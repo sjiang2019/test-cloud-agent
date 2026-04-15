@@ -5,10 +5,12 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import Repo
-from app.schemas import RepoCreate, RepoResponse
+from app.indexer import index_repo
+from app.models import Repo, RepoFile
+from app.schemas import RepoCreate, RepoFileResponse, RepoResponse
 
 router = APIRouter(prefix="/api/repos", tags=["repos"])
 
@@ -29,30 +31,38 @@ async def list_repos(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-async def check_repo_accessible(url: str) -> bool:
-    """Check if a git repo URL is reachable via git ls-remote."""
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "git", "ls-remote", "--exit-code", url,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        await asyncio.wait_for(proc.wait(), timeout=15)
-        return proc.returncode == 0
-    except (asyncio.TimeoutError, OSError):
-        return False
-
-
 @router.post("", response_model=RepoResponse, status_code=201)
-async def create_repo(body: RepoCreate, db: AsyncSession = Depends(get_db)):
+async def create_repo(
+    body: RepoCreate,
+    db: AsyncSession = Depends(get_db),
+):
     name = extract_repo_name(body.url)
-    reachable = await check_repo_accessible(body.url)
-    status = "ready" if reachable else "error"
-    repo = Repo(url=body.url, name=name, status=status)
+    repo = Repo(url=body.url, name=name, status="cloning")
     db.add(repo)
     await db.commit()
     await db.refresh(repo)
+
+    asyncio.create_task(index_repo(repo.id))
     return repo
+
+
+@router.get("/{repo_id}", response_model=RepoResponse)
+async def get_repo(repo_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Repo).where(Repo.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repo not found")
+    return repo
+
+
+@router.get("/{repo_id}/files", response_model=list[RepoFileResponse])
+async def list_repo_files(repo_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(RepoFile)
+        .where(RepoFile.repo_id == repo_id)
+        .order_by(RepoFile.path)
+    )
+    return result.scalars().all()
 
 
 @router.delete("/{repo_id}", status_code=204)
